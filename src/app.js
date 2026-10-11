@@ -2,16 +2,9 @@
   'use strict';
 
   var P = window.PUZZLE;
-  var slotsEl = document.getElementById('slots');
-  var bankEl = document.getElementById('bank');
-  var statusEl = document.getElementById('status');
   var taskEl = document.getElementById('task');
-  var resetBtn = document.getElementById('reset');
 
-  var tiles = [];   // { letter, el, slot }
-  var slots = [];   // { el, tile }
-  var busy = false;
-  var solved = false;
+  // --- Dulkóðun ---------------------------------------------------------------
 
   function b64(s) {
     var bin = atob(s), out = new Uint8Array(bin.length);
@@ -19,24 +12,65 @@
     return out;
   }
 
-  // Leiðir lykil af orðinu og reynir að afkóða. Skilar HTML eða null.
+  function subtle() {
+    var s = window.crypto && window.crypto.subtle;
+    if (!s) throw new Error('no-crypto');
+    return s;
+  }
+
+  // Leiðir lykil af orðinu og reynir að afkóða.
+  // Skilar { html, key } ef orðið er rétt, annars null.
   function tryDecrypt(word, payload) {
-    payload = payload || P;
-    var subtle = window.crypto && window.crypto.subtle;
-    if (!subtle) return Promise.reject(new Error('no-crypto'));
+    var s;
+    try { s = subtle(); } catch (e) { return Promise.reject(e); }
     var enc = new TextEncoder();
-    return subtle.importKey('raw', enc.encode(word.replace(/\s+/g, '').toLocaleLowerCase('is')), 'PBKDF2', false, ['deriveKey'])
+    var key;
+    return s.importKey('raw', enc.encode(word.replace(/\s+/g, '').toLocaleLowerCase('is')), 'PBKDF2', false, ['deriveKey'])
       .then(function (base) {
-        return subtle.deriveKey(
+        return s.deriveKey(
           { name: 'PBKDF2', salt: b64(payload.salt), iterations: payload.iterations, hash: 'SHA-256' },
           base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
       })
-      .then(function (key) {
-        return subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));
+      .then(function (k) {
+        key = k;
+        return s.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));
       })
-      .then(function (buf) { return new TextDecoder().decode(buf); },
+      .then(function (buf) { return { html: new TextDecoder().decode(buf), key: key }; },
             function () { return null; });
   }
+
+  // Sækir og afkóðar myndir og hljóð skrefsins (data-enc) með lykli þess.
+  function loadAssets(container, key) {
+    container.querySelectorAll('[data-enc]').forEach(function (el) {
+      fetch(el.getAttribute('data-enc'))
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then(function (buf) { return subtle().decrypt({ name: 'AES-GCM', iv: b64(el.getAttribute('data-iv')) }, key, buf); })
+        .then(function (plain) {
+          el.src = URL.createObjectURL(new Blob([plain], { type: el.getAttribute('data-type') }));
+          el.removeAttribute('data-enc');
+        })
+        .catch(function () { el.insertAdjacentHTML('afterend', '<p class="status bad">Ekki tókst að hlaða skrá. Endurhlaðaðu síðuna.</p>'); });
+    });
+  }
+
+  function reveal(el) {
+    el.hidden = false;
+    el.classList.add('reveal');
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.focus({ preventScroll: true });
+  }
+
+  // Setur upp allt sem er í nýopnuðu skrefi.
+  function initStage(container, key) {
+    loadAssets(container, key);
+    setupPaint(container);
+    setupCodeForm(container);
+    setupWordPuzzles(container);
+  }
+
+  // --- Stafaþraut ---------------------------------------------------------------
+  // root inniheldur .slots, .bank, .reset og .status.
+  // check(word) skilar Promise sem leysist með niðurstöðu (eða null ef rangt).
 
   function shuffle(arr) {
     var a = arr.slice();
@@ -47,110 +81,175 @@
     return a;
   }
 
-  function setStatus(text, kind) {
-    statusEl.textContent = text;
-    statusEl.className = 'status' + (kind ? ' ' + kind : '');
-  }
+  function createPuzzle(root, letters, check, onSolved) {
+    var slotsEl = root.querySelector('.slots');
+    var bankEl = root.querySelector('.bank');
+    var statusEl = root.querySelector('.status');
+    var resetBtn = root.querySelector('.reset');
+    var tiles = [], slots = [];
+    var busy = false, solved = false, round = 0;
 
-  function render() {
-    slots.forEach(function (s, i) {
-      var letter = s.tile ? s.tile.letter : '';
-      s.el.textContent = letter;
-      s.el.classList.toggle('filled', !!s.tile);
-      s.el.disabled = !s.tile || solved;
-      s.el.setAttribute('aria-label', 'Hólf ' + (i + 1) + (letter ? ': ' + letter : ', tómt'));
-    });
-    tiles.forEach(function (t) {
-      var used = t.slot !== null;
-      t.el.classList.toggle('used', used);
-      t.el.disabled = used || solved;
-      t.el.setAttribute('aria-hidden', used ? 'true' : 'false');
-    });
-  }
+    function setStatus(text, kind) {
+      statusEl.textContent = text;
+      statusEl.className = 'status' + (kind ? ' ' + kind : '');
+    }
 
-  function build(order) {
-    slotsEl.innerHTML = '';
-    bankEl.innerHTML = '';
-    slots = [];
-    tiles = [];
-    P.letters.forEach(function (_, i) {
+    function render() {
+      slots.forEach(function (s, i) {
+        var letter = s.tile ? s.tile.letter : '';
+        s.el.textContent = letter;
+        s.el.classList.toggle('filled', !!s.tile);
+        s.el.disabled = !s.tile || solved;
+        s.el.setAttribute('aria-label', 'Hólf ' + (i + 1) + (letter ? ': ' + letter : ', tómt'));
+      });
+      tiles.forEach(function (t) {
+        var used = t.slot !== null;
+        t.el.classList.toggle('used', used);
+        t.el.disabled = used || solved;
+        t.el.setAttribute('aria-hidden', used ? 'true' : 'false');
+      });
+    }
+
+    function button(cls, text, onClick, parent) {
       var el = document.createElement('button');
       el.type = 'button';
-      el.className = 'slot';
-      var slot = { el: el, tile: null };
-      el.addEventListener('click', function () { removeFrom(slot); });
-      slotsEl.appendChild(el);
-      slots.push(slot);
-    });
-    order.forEach(function (letter) {
-      var el = document.createElement('button');
-      el.type = 'button';
-      el.className = 'tile';
-      el.textContent = letter;
-      var tile = { letter: letter, el: el, slot: null };
-      el.addEventListener('click', function () { place(tile); });
-      bankEl.appendChild(el);
-      tiles.push(tile);
-    });
-    render();
-  }
+      el.className = cls;
+      el.textContent = text;
+      el.addEventListener('click', onClick);
+      parent.appendChild(el);
+      return el;
+    }
 
-  function place(tile) {
-    if (busy || solved || tile.slot !== null) return;
-    var slot = slots.find(function (s) { return !s.tile; });
-    if (!slot) return;
-    slot.tile = tile;
-    tile.slot = slot;
-    setStatus('');
-    render();
-    if (slots.every(function (s) { return s.tile; })) check();
-  }
+    function build(order) {
+      slotsEl.innerHTML = '';
+      bankEl.innerHTML = '';
+      slots = [];
+      tiles = [];
+      letters.forEach(function () {
+        var slot = { tile: null };
+        slot.el = button('slot', '', function () { removeFrom(slot); }, slotsEl);
+        slots.push(slot);
+      });
+      order.forEach(function (letter) {
+        var tile = { letter: letter, slot: null };
+        tile.el = button('tile', letter, function () { place(tile); }, bankEl);
+        tiles.push(tile);
+      });
+      render();
+    }
 
-  function removeFrom(slot) {
-    if (busy || solved || !slot.tile) return;
-    slot.tile.slot = null;
-    slot.tile = null;
-    setStatus('');
-    render();
-  }
+    function place(tile) {
+      if (busy || solved || tile.slot !== null) return;
+      var slot = slots.find(function (s) { return !s.tile; });
+      if (!slot) return;
+      slot.tile = tile;
+      tile.slot = slot;
+      setStatus('');
+      render();
+      if (slots.every(function (s) { return s.tile; })) submit();
+    }
 
-  function check() {
-    busy = true;
-    setStatus('Athuga…');
-    var word = slots.map(function (s) { return s.tile.letter; }).join('');
-    tryDecrypt(word).then(function (html) {
+    function removeFrom(slot) {
+      if (busy || solved || !slot.tile) return;
+      slot.tile.slot = null;
+      slot.tile = null;
+      setStatus('');
+      render();
+    }
+
+    function submit() {
+      busy = true;
+      setStatus('Athuga…');
+      var word = slots.map(function (s) { return s.tile.letter; }).join('');
+      check(word).then(function (result) {
+        busy = false;
+        if (result) {
+          solved = true;
+          slotsEl.classList.add('solved');
+          render();
+          setStatus(onSolved(result, word) || 'Rétt!', 'good');
+        } else {
+          setStatus('Ekki alveg. Hlustaðu aftur og reyndu á ný.', 'bad');
+          slotsEl.classList.remove('shake');
+          void slotsEl.offsetWidth;
+          slotsEl.classList.add('shake');
+        }
+      }, function () {
+        busy = false;
+        setStatus('Vafrinn styður ekki dulkóðun. Prófaðu nýrri vafra.', 'bad');
+      });
+    }
+
+    // Stokkar og passar að upphafsröðin sé aldrei rétta orðið
+    // (prófað með því að reyna að afkóða, ekkert svar er geymt).
+    function newRound() {
+      if (solved) return;
       busy = false;
-      if (html) {
-        solved = true;
-        slotsEl.classList.add('solved');
-        render();
-        setStatus('');
-        taskEl.innerHTML = html;
-        taskEl.hidden = false;
-        taskEl.classList.add('reveal');
-        var ok = taskEl.querySelector('.success');
-        if (ok) setStatus(ok.textContent, 'good');
-        taskEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        taskEl.focus({ preventScroll: true });
-        setupPaint();
-        setupCodeForm();
-      } else {
-        setStatus('Ekki alveg. Hlustaðu aftur og reyndu á ný.', 'bad');
-        slotsEl.classList.remove('shake');
-        void slotsEl.offsetWidth;
-        slotsEl.classList.add('shake');
-      }
-    }, function () {
-      busy = false;
-      setStatus('Vafrinn styður ekki dulkóðun. Prófaðu nýrri vafra.', 'bad');
-    });
+      slotsEl.classList.remove('shake');
+      setStatus('');
+      var order = shuffle(letters);
+      var mine = ++round;
+      build(order);
+      check(order.join('')).then(function (result) {
+        var untouched = tiles.every(function (t) { return t.slot === null; });
+        if (result && mine === round && untouched) newRound();
+      }, function () {});
+    }
+
+    resetBtn.addEventListener('click', newRound);
+    newRound();
   }
 
-  // Litunaræfing: nemandinn litar lendingarsvæðið á kortið.
-  // Svæðakortið (grátóna PNG) segir hvað hver punktur er:
-  //   0 = utan reits, 85 = rangt svæði, 170 = vikmörk við línuna, 255 = rétt svæði.
-  function setupPaint() {
-    var root = taskEl.querySelector('.paint');
+  // --- 1. skref: heiti þorpsins --------------------------------------------------
+
+  createPuzzle(document.querySelector('.puzzle'), P.letters,
+    function (word) { return tryDecrypt(word, P); },
+    function (result) {
+      taskEl.innerHTML = result.html;
+      reveal(taskEl);
+      initStage(taskEl, result.key);
+      var ok = taskEl.querySelector('.success');
+      return ok ? ok.textContent : 'Rétt!';
+    });
+
+  // --- Stafarugl í síðari skrefum -------------------------------------------------
+  // Hvert svar er rétt ef það afkóðar smá tákn. Þegar öll eru leyst eru svörin
+  // saman lykillinn að valinu (.choice).
+
+  function setupWordPuzzles(container) {
+    var puzzles = container.querySelectorAll('.word-puzzle');
+    var choice = container.querySelector('.choice');
+    if (!puzzles.length) return;
+    var answers = [];
+    var left = puzzles.length;
+    puzzles.forEach(function (root, i) {
+      var payload = JSON.parse(root.getAttribute('data-payload'));
+      createPuzzle(root, payload.letters,
+        function (word) { return tryDecrypt(word, payload); },
+        function (result, word) {
+          answers[i] = word.toLocaleLowerCase('is');
+          if (--left === 0 && choice) openChoice();
+          return 'Rétt!';
+        });
+    });
+
+    function openChoice() {
+      var payload = JSON.parse(choice.getAttribute('data-payload'));
+      tryDecrypt(answers.join('|'), payload).then(function (result) {
+        if (!result) return;
+        choice.innerHTML = result.html;
+        reveal(choice);
+      });
+    }
+  }
+
+  // --- Litunaræfing -----------------------------------------------------------------
+  // Nemandinn litar lendingarsvæðið á kortið. Svæðakortið (grátóna PNG) segir
+  // hvað hver punktur er: 0 = utan reits, 85 = rangt svæði,
+  // 170 = vikmörk við línuna, 255 = rétt svæði.
+
+  function setupPaint(container) {
+    var root = container.querySelector('.paint');
     if (!root) return;
     var layer = root.querySelector('.paint-layer');
     var shade = root.querySelector('.paint-shade');
@@ -161,7 +260,7 @@
     // Hlutfall þess sem litað er sem má lenda á röngu svæði
     var maxOutside = parseFloat(root.getAttribute('data-max-outside')) || 0;
     var zonesUrl = root.getAttribute('data-zones');
-    var reveal = JSON.parse(root.getAttribute('data-reveal'));
+    var secret = JSON.parse(root.getAttribute('data-reveal'));
     var ctx = layer.getContext('2d');
     var zones = null;      // Uint8Array, flokkur hvers punkts
     var allowed = null;    // canvas: ógegnsætt þar sem má lita
@@ -212,7 +311,7 @@
     function stroke(from, to) {
       ctx.save();
       ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-      ctx.strokeStyle = ctx.fillStyle = '#ff2fd0';
+      ctx.strokeStyle = '#ff2fd0';
       ctx.lineWidth = size;
       ctx.lineCap = ctx.lineJoin = 'round';
       ctx.beginPath();
@@ -265,12 +364,10 @@
     });
 
     function unlock() {
-      var bin = atob(zonesUrl.split(',')[1]), bytes = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      var subtle = window.crypto.subtle;
-      return subtle.digest('SHA-256', bytes)
-        .then(function (raw) { return subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']); })
-        .then(function (key) { return subtle.decrypt({ name: 'AES-GCM', iv: b64(reveal.iv) }, key, b64(reveal.data)); })
+      var s = subtle();
+      return s.digest('SHA-256', b64(zonesUrl.split(',')[1]))
+        .then(function (raw) { return s.importKey('raw', raw, 'AES-GCM', false, ['decrypt']); })
+        .then(function (key) { return s.decrypt({ name: 'AES-GCM', iv: b64(secret.iv) }, key, b64(secret.data)); })
         .then(function (buf) { return new TextDecoder().decode(buf); });
     }
 
@@ -295,7 +392,7 @@
         revealEl.innerHTML = html;
         revealEl.hidden = false;
         revealEl.classList.add('reveal');
-        var input = taskEl.querySelector('.code-form input');
+        var input = container.querySelector('.code-form input');
         revealEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (input) input.focus({ preventScroll: true });
       }, function () {
@@ -304,16 +401,17 @@
     });
   }
 
-  // 2. skref: kóði opnar næsta hluta (líka dulkóðaðan)
-  function setupCodeForm() {
-    var form = taskEl.querySelector('.code-form');
-    var payloadEl = taskEl.querySelector('.next-payload');
+  // --- Kóði sem opnar næsta skref -------------------------------------------------
+
+  function setupCodeForm(container) {
+    var form = container.querySelector('.code-form');
+    var payloadEl = container.querySelector('.next-payload');
     if (!form || !payloadEl) return;
     var next = JSON.parse(payloadEl.textContent);
     var input = form.querySelector('input');
     var button = form.querySelector('button');
     var status = form.querySelector('.code-status');
-    var target = taskEl.querySelector('.next-stage');
+    var target = container.querySelector('.next-stage');
     var length = parseInt(form.getAttribute('data-length'), 10);
     var checking = false;
 
@@ -324,21 +422,19 @@
 
     function submit() {
       var value = input.value.replace(/\s+/g, '');
-      if (checking) return;
+      if (checking || input.disabled) return;
       if (value.length !== length) { say('Kóðinn er ' + length + ' stafir.', 'bad'); return; }
       checking = true;
       button.disabled = true;
       say('Athuga…');
-      tryDecrypt(value, next).then(function (html) {
+      tryDecrypt(value, next).then(function (result) {
         checking = false;
-        if (html) {
+        if (result) {
           input.disabled = true;
           say('Kóðinn er réttur!', 'good');
-          target.innerHTML = html;
-          target.hidden = false;
-          target.classList.add('reveal');
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          target.focus({ preventScroll: true });
+          target.innerHTML = result.html;
+          reveal(target);
+          initStage(target, result.key);
         } else {
           button.disabled = false;
           say('Þessi kóði passar ekki. Athugaðu hann og reyndu aftur.', 'bad');
@@ -360,27 +456,4 @@
       if (status.textContent && !checking) say('');
     });
   }
-
-  // Stokkar og passar að upphafsröðin sé aldrei rétta orðið
-  // (prófað með því að reyna að afkóða, ekkert svar er geymt).
-  function newRound() {
-    solved = false;
-    busy = false;
-    slotsEl.classList.remove('solved', 'shake');
-    taskEl.hidden = true;
-    taskEl.classList.remove('reveal');
-    taskEl.innerHTML = '';
-    setStatus('');
-    var order = shuffle(P.letters);
-    build(order);
-    var round = order;
-    tryDecrypt(order.join('')).then(function (html) {
-      if (html && tiles.length && tiles[0].letter === round[0] && tiles.every(function (t) { return t.slot === null; })) {
-        newRound();
-      }
-    }, function () {});
-  }
-
-  resetBtn.addEventListener('click', newRound);
-  newRound();
 })();
