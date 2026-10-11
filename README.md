@@ -7,7 +7,7 @@
 ## Skrefin
 
 1. Nemendur raða stöfunum í heiti þorpsins. Rétt röð opnar texta og kort.
-2. Nemendur lita lendingarsvæðið á kortið (aðeins innan reitsins). Ef þau lita a.m.k. 90% af rétta svæðinu og ekkert utan þess birtist kóði.
+2. Nemendur lita lendingarsvæðið á kortið (aðeins innan reitsins). Ef þau lita a.m.k. 90% af rétta svæðinu og í mesta lagi 5% af því sem þau lita lendir utan þess birtist kóði. Mörkin eru stillt í `build.mjs` (`data-coverage` og `data-max-outside`).
 3. Kóðinn opnar næsta verkefni.
 
 Hvert skref er dulkóðað og næsta skref er geymt dulkóðað inni í því fyrra.

@@ -69,7 +69,7 @@ async function renderPaint(html, code) {
     const reveal = await encryptWithBytes(zoneBytes,
       `<p class="paint-code">Lendingarsvæðið er gott! Kóðinn ykkar er <strong>${escapeHtml(code.toLocaleUpperCase('is'))}</strong></p>`);
     const widget = `
-<div class="paint" data-coverage="0.9" data-zones="data:image/png;base64,${b64(zoneBytes)}"
+<div class="paint" data-coverage="0.9" data-max-outside="0.05" data-zones="data:image/png;base64,${b64(zoneBytes)}"
      data-reveal="${escapeHtml(JSON.stringify(reveal))}">
   <div class="paint-stage">
     <img src="${imgData}" alt="Hæðarlínukort af svæðinu: loftmynd með hæðarlínum frá 1232 til 1278 metra yfir sjávarmáli, innan reits sem afmarkaður er með gulri línu.">

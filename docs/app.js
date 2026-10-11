@@ -158,6 +158,8 @@
     var revealEl = root.querySelector('.paint-reveal');
     var checkBtn = root.querySelector('[data-action="check"]');
     var minCoverage = parseFloat(root.getAttribute('data-coverage')) || 0.9;
+    // Hlutfall þess sem litað er sem má lenda á röngu svæði
+    var maxOutside = parseFloat(root.getAttribute('data-max-outside')) || 0;
     var zonesUrl = root.getAttribute('data-zones');
     var reveal = JSON.parse(root.getAttribute('data-reveal'));
     var ctx = layer.getContext('2d');
@@ -283,7 +285,7 @@
         if (painted) any++;
       }
       if (!any) { say('Litaðu fyrst lendingarsvæðið á kortið.', 'bad'); return; }
-      if (bad > 0) { say('Ekki alveg. Eitthvað af því sem þú litaðir hentar ekki til að varpa farminum niður.', 'bad'); return; }
+      if (bad > maxOutside * (good + bad)) { say('Ekki alveg. Eitthvað af því sem þú litaðir hentar ekki til að varpa farminum niður.', 'bad'); return; }
       if (good / total < minCoverage) { say('Ekki alveg. Lendingarsvæðið er stærra en það sem þú hefur litað.', 'bad'); return; }
       done = true;
       root.classList.add('done');
