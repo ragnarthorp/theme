@@ -1,0 +1,153 @@
+:root {
+  --bg: #f6efe4;
+  --surface: #fffaf2;
+  --ink: #2c2219;
+  --muted: #6b5a49;
+  --line: #cdb99f;
+  --sky: #2f6f8f;
+  --sky-soft: #dcebf1;
+  --earth: #9a4f2b;
+  --tile: #b9622f;
+  --tile-ink: #fffaf2;
+  --good: #2f6b3c;
+  --bad: #9b2f22;
+  --shadow: 0 2px 0 rgba(60, 35, 15, .25);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1914;
+    --surface: #27211b;
+    --ink: #f1e8db;
+    --muted: #c3b19c;
+    --line: #5a4a3a;
+    --sky: #8cc3dd;
+    --sky-soft: #22323a;
+    --earth: #e0a27a;
+    --tile: #c9733f;
+    --tile-ink: #1d1914;
+    --good: #8fd19c;
+    --bad: #f0907f;
+    --shadow: 0 2px 0 rgba(0, 0, 0, .5);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 1.125rem/1.6 "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+
+h1, h2 { font-family: Fraunces, Georgia, serif; font-weight: 600; line-height: 1.2; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.8rem); margin: 8px 0 20px; text-align: center; color: var(--earth); }
+h2 { font-size: 1.5rem; margin: 0 0 8px; }
+
+.hero { margin: 0 0 24px; }
+.hero img {
+  display: block; width: 100%; height: auto;
+  border-radius: 14px; border: 1px solid var(--line);
+}
+
+section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.audio audio { width: 100%; margin-top: 4px; }
+
+.hint { color: var(--muted); margin: 0 0 16px; }
+
+.slots, .bank {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 8px;
+}
+.slots { margin-bottom: 24px; }
+.bank {
+  padding: 16px 8px;
+  background: var(--sky-soft);
+  border-radius: 12px;
+  min-height: 92px;
+}
+
+.slot, .tile {
+  width: 60px; height: 60px;
+  font: 700 1.9rem/1 "Source Sans 3", system-ui, sans-serif;
+  border-radius: 10px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+}
+.slot {
+  background: var(--surface);
+  color: var(--ink);
+  border: 2px dashed var(--line);
+}
+.slot.filled { border-style: solid; border-color: var(--earth); }
+.slot:disabled { cursor: default; opacity: 1; }
+.tile {
+  background: var(--tile);
+  color: var(--tile-ink);
+  border: none;
+  box-shadow: var(--shadow);
+}
+.tile:active { transform: translateY(2px); box-shadow: none; }
+.tile.used { visibility: hidden; }
+
+/* Á mjóum skjá komast tíu hólf í tvær línur */
+@media (max-width: 720px) {
+  .slots, .bank { gap: 6px; }
+  .slot, .tile { width: 56px; height: 56px; font-size: 1.75rem; }
+  section { padding: 16px 12px; }
+}
+
+button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+
+.actions { display: flex; justify-content: center; margin-top: 20px; }
+.reset {
+  font: 600 1.1rem/1 "Source Sans 3", system-ui, sans-serif;
+  min-height: 48px; padding: 0 24px;
+  color: var(--sky); background: transparent;
+  border: 2px solid var(--sky); border-radius: 999px;
+  cursor: pointer; touch-action: manipulation;
+}
+
+.status { min-height: 1.6em; margin: 16px 0 0; text-align: center; font-weight: 600; }
+.status.bad { color: var(--bad); }
+.status.good { color: var(--good); }
+
+.slots.shake { animation: shake .45s ease-in-out; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(9px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(4px); }
+}
+.slots.solved + .bank { display: none; }
+.slots.solved .slot { border-color: var(--good); color: var(--good); }
+
+.task { font-size: 1.2rem; line-height: 1.7; }
+.task:focus { outline: none; }
+.task.reveal { animation: reveal .7s ease-out both; }
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.task .success {
+  font-family: Fraunces, Georgia, serif; font-size: 1.6rem;
+  color: var(--good); margin-top: 0;
+}
+.task h1, .task h2, .task h3 { color: var(--earth); }
+.task a { color: var(--sky); }
+.task img { max-width: 100%; height: auto; }
+.task li { margin-bottom: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slots.shake, .task.reveal { animation: none; }
+}

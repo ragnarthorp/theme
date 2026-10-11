@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="is">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Neyðarkall frá Andesfjöllum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Neyðarkall frá Andesfjöllum</h1>
+  </header>
+
+  <figure class="hero">
+    <picture>
+      <source srcset="ernesto.webp" type="image/webp">
+      <img src="ernesto.jpg" width="1344" height="896"
+           alt="Ernesto, gamall bóndi með hatt, hvítt skegg og poncho, situr á steini við grænbláa á. Í baksýn eru brött fjöll, hrunin steinbrú og gamalt þorp á klettabrún.">
+    </picture>
+  </figure>
+
+  <section class="audio" aria-labelledby="hlusta">
+    <h2 id="hlusta">Hlustaðu á Ernesto</h2>
+    <audio controls preload="metadata" src="saga.mp3">
+      Vafrinn þinn getur ekki spilað hljóðið. <a href="saga.mp3">Sæktu það hér.</a>
+    </audio>
+  </section>
+
+  <section class="puzzle" aria-labelledby="thraut">
+    <h2 id="thraut">Hvað heitir þorpið?</h2>
+    <p class="hint">Raðaðu stöfunum í rétta röð. Pikkaðu á staf til að setja hann í næsta lausa hólf og á staf í hólfi til að taka hann aftur.</p>
+
+    <div class="slots" id="slots" role="group" aria-label="Hólf fyrir svarið"></div>
+    <div class="bank" id="bank" role="group" aria-label="Stafir til að raða"></div>
+
+    <div class="actions">
+      <button type="button" class="reset" id="reset">Byrja aftur</button>
+    </div>
+
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="task" id="task" hidden tabindex="-1" aria-label="Verkefnið"></section>
+</main>
+
+<script>window.PUZZLE = {"iterations":250000,"salt":"bT1pHnm+Tim3aUlrHLkrjA==","iv":"V9HJxwRZGsHjNFds","data":"lszjnTAsvUe6UIDFGr+8EIEaWvTSWSCUm02XYEZ0pD64LXqb/3E9W5w9pNiCVO9MPn9RdtDg/A2cUs3hCkRVDh/9XHiHtvdsCgj5HJvWgx/ms/t8EJdfQmsVcbrDXRya75ogS++FfQwM9teF1nBhQsi3ueTkHN+f/vq6gMOP5+lmNKArBjvWHvHZvQOcgfrhCsWpZQuW9UOELivvclL+8190ssK+7jwBjhLjbA3vegMErxoPVWUIew1xHQglqDpSv68Qvs/VtpGh3uBSDTCBCwD4m7h4B6n3VEJDZUxOluWIHvmcPfTXOpsH4q6KxgZQ7dZCYO7n7bkWanv1mrGuwTja6/gA5bDz3+i1tdnbxmxvwPZB1k+wF/lJw5B8hl/0pXdopTkAuzvwjG/HnfLvPAG6MI+DR96EMsQ8CRFaJkzNy6JMT0gEOZ8Qq4fnlRK2uba4bo/5y4RnlWTJgZGtf/UsQw7znq2DLov08Im3BEmeYdwYP2GKQNh3zGZ9HiUHltXXve8QsGv6Iol0bP0vBQX48hMZscRRiNqzENYK14zbzyh77WUKZiHytexGN5qbJ8XK3BjbPoCwxWvIwd5bc0kg9n9HHlxY1sOFBMKhc+obGWZLFlwGyvduBptfuUi03y7q78SnL0re+Roe1sa4GtHz47UnM68T779qrEKTnL5z7IMEyqzFlg==","letters":["A","A","A","A","C","H","K","L","L","P"]};</script>
+<script src="app.js"></script>
+</body>
+</html>
