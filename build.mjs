@@ -3,9 +3,14 @@
 // Allt leynilegt efni er í möppunni efni/, sem fer aldrei á GitHub (sjá .gitignore):
 //   efni/lykilord.txt   orðið sem nemendur raða (opnar 1. skref)
 //   efni/verkefni.md    texti 1. skrefs
-//   efni/kodi.txt       kóðinn sem kennarinn gefur (opnar 2. skref), má sleppa
+//   efni/kodi.txt       kóðinn sem opnar 2. skref, má sleppa
 //   efni/verkefni2.md   texti 2. skrefs, má sleppa
 //   efni/*.jpg|png|webp myndir sem verkefnatextarnir vísa í, t.d. ![Kort](kort.jpg)
+//   efni/kort-svaedi.png svæðakort fyrir litunaræfinguna (sjá README.md)
+//
+// Litunaræfing er sett inn í verkefni.md með línunni
+//   <!-- litakort: kort.jpg kort-svaedi.png -->
+// Þegar nemandi hefur litað rétt svæði birtist kóðinn úr kodi.txt.
 //
 // Hvert skref er dulkóðað (AES-GCM, lykill leiddur með PBKDF2/SHA-256) og
 // 2. skref er geymt dulkóðað inni í 1. skrefi. Myndir eru felldar inn í
@@ -42,6 +47,59 @@ async function renderMarkdown(file) {
   return html;
 }
 
+// AES-GCM með lykli sem er SHA-256 af tilteknum bætum (notað fyrir litunaræfinguna).
+async function encryptWithBytes(bytes, text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const raw = await crypto.subtle.digest('SHA-256', bytes);
+  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text)));
+  return { iv: b64(iv), data: b64(ct) };
+}
+
+// Breytir <!-- litakort: mynd svæðakort --> í litunaræfingu.
+async function renderPaint(html, code) {
+  const re = /<!--\s*litakort:\s*(\S+)\s+(\S+)\s*-->/g;
+  for (const m of [...html.matchAll(re)]) {
+    const [, image, zones] = m;
+    for (const f of [image, zones]) if (!await exists(`${SRC}/${f}`)) fail(`Fannst ekki: ${SRC}/${f}`);
+    if (!code) fail('Litunaræfing þarf kóða í efni/kodi.txt.');
+    const ext = image.split('.').pop().toLowerCase();
+    const imgData = `data:${MIME[ext]};base64,${b64(await readFile(`${SRC}/${image}`))}`;
+    const zoneBytes = await readFile(`${SRC}/${zones}`);
+    const reveal = await encryptWithBytes(zoneBytes,
+      `<p class="paint-code">Lendingarsvæðið er gott! Kóðinn ykkar er <strong>${escapeHtml(code.toLocaleUpperCase('is'))}</strong></p>`);
+    const widget = `
+<div class="paint" data-coverage="0.9" data-zones="data:image/png;base64,${b64(zoneBytes)}"
+     data-reveal="${escapeHtml(JSON.stringify(reveal))}">
+  <div class="paint-stage">
+    <img src="${imgData}" alt="Hæðarlínukort af svæðinu: loftmynd með hæðarlínum frá 1232 til 1278 metra yfir sjávarmáli, innan reits sem afmarkaður er með gulri línu.">
+    <canvas class="paint-shade" aria-hidden="true"></canvas>
+    <canvas class="paint-layer" aria-label="Litaðu lendingarsvæðið á kortið"></canvas>
+  </div>
+  <div class="paint-tools">
+    <div class="tool-group" role="group" aria-label="Verkfæri">
+      <button type="button" data-tool="brush" aria-pressed="true">Pensill</button>
+      <button type="button" data-tool="eraser" aria-pressed="false">Strokleður</button>
+    </div>
+    <div class="tool-group" role="group" aria-label="Stærð">
+      <button type="button" data-size="5" aria-pressed="false">Mjór</button>
+      <button type="button" data-size="12" aria-pressed="true">Miðlungs</button>
+      <button type="button" data-size="26" aria-pressed="false">Breiður</button>
+    </div>
+    <div class="tool-group">
+      <button type="button" data-action="clear">Hreinsa allt</button>
+      <button type="button" data-action="check" class="primary">Athuga svæðið</button>
+    </div>
+  </div>
+  <p class="paint-status" role="status" aria-live="polite"></p>
+  <div class="paint-reveal" hidden></div>
+</div>
+`;
+    html = html.replace(m[0], widget);
+  }
+  return html;
+}
+
 async function encrypt(password, html) {
   const enc = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -60,16 +118,17 @@ if (!password) fail(`Vantar lykilorð: settu það í ${SRC}/lykilord.txt.`);
 if (!await exists(`${SRC}/verkefni.md`)) fail(`Vantar ${SRC}/verkefni.md.`);
 
 const word = password[0].toLocaleUpperCase('is') + password.slice(1);
-let stage1 = `<p class="success">Rétt! ${escapeHtml(word)} bíður eftir ykkur.</p>\n` + await renderMarkdown(`${SRC}/verkefni.md`);
-
-// 2. skref: kóði frá kennara (valkvætt)
 const code = normalize(await readText(`${SRC}/kodi.txt`));
+let stage1 = `<p class="success">Rétt! ${escapeHtml(word)} bíður eftir ykkur.</p>\n` +
+  await renderPaint(await renderMarkdown(`${SRC}/verkefni.md`), code);
+
+// 2. skref: kóðinn opnar næsta verkefni (valkvætt)
 if (code) {
   if (!await exists(`${SRC}/verkefni2.md`)) fail(`Vantar ${SRC}/verkefni2.md (kodi.txt er til).`);
   const stage2 = await encrypt(code, await renderMarkdown(`${SRC}/verkefni2.md`));
   stage1 += `
 <form class="code-form" novalidate data-length="${[...code].length}">
-  <label for="code">Kóði frá kennara</label>
+  <label for="code">Kóði</label>
   <div class="code-row">
     <input id="code" name="code" type="text" maxlength="${[...code].length}" autocomplete="off"
            autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go">

@@ -180,6 +180,46 @@ button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
 .next-stage:focus { outline: none; }
 .next-stage.reveal { animation: reveal .7s ease-out both; }
 
+.paint { margin: 20px 0 8px; }
+.paint-stage { position: relative; line-height: 0; }
+.task .paint-stage img { margin: 0; }
+.paint-stage canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border-radius: 10px;
+}
+.paint-layer { opacity: .5; touch-action: none; cursor: crosshair; }
+.paint.done .paint-layer { cursor: default; }
+.paint-tools {
+  display: flex; flex-wrap: wrap; gap: 10px 16px;
+  justify-content: space-between; margin-top: 14px;
+}
+.tool-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.paint-tools button {
+  min-height: 48px; padding: 0 16px;
+  font: 600 1.05rem/1 "Source Sans 3", system-ui, sans-serif;
+  color: var(--ink); background: var(--surface);
+  border: 2px solid var(--line); border-radius: 10px;
+  cursor: pointer; touch-action: manipulation;
+}
+.paint-tools button[aria-pressed="true"] {
+  background: var(--sky); border-color: var(--sky); color: var(--surface);
+}
+.paint-tools button.primary {
+  background: var(--tile); border-color: var(--tile); color: var(--tile-ink);
+  box-shadow: var(--shadow);
+}
+.paint-tools button:disabled { opacity: .6; cursor: default; }
+.paint-status { min-height: 1.6em; margin: 12px 0 0; font-weight: 600; font-size: 1.05rem; }
+.paint-status.bad { color: var(--bad); }
+.paint-status.good { color: var(--good); }
+.paint-reveal.reveal { animation: reveal .7s ease-out both; }
+.paint-code {
+  margin: 12px 0 0; padding: 16px 20px;
+  font-size: 1.3rem; border-radius: 12px;
+  background: var(--sky-soft);
+}
+.paint-code strong { font-size: 1.6rem; letter-spacing: .12em; color: var(--earth); }
+
 @media print {
   .hero, .audio, .puzzle, .code-form { display: none; }
   body { background: #fff; color: #000; }
@@ -187,5 +227,5 @@ button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slots.shake, .task.reveal, .code-form.shake, .next-stage.reveal { animation: none; }
+  .slots.shake, .task.reveal, .code-form.shake, .next-stage.reveal, .paint-reveal.reveal { animation: none; }
 }

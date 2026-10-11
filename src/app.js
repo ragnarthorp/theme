@@ -132,6 +132,7 @@
         if (ok) setStatus(ok.textContent, 'good');
         taskEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         taskEl.focus({ preventScroll: true });
+        setupPaint();
         setupCodeForm();
       } else {
         setStatus('Ekki alveg. Hlustaðu aftur og reyndu á ný.', 'bad');
@@ -145,7 +146,163 @@
     });
   }
 
-  // 2. skref: kóði frá kennara opnar næsta hluta (líka dulkóðaðan)
+  // Litunaræfing: nemandinn litar lendingarsvæðið á kortið.
+  // Svæðakortið (grátóna PNG) segir hvað hver punktur er:
+  //   0 = utan reits, 85 = rangt svæði, 170 = vikmörk við línuna, 255 = rétt svæði.
+  function setupPaint() {
+    var root = taskEl.querySelector('.paint');
+    if (!root) return;
+    var layer = root.querySelector('.paint-layer');
+    var shade = root.querySelector('.paint-shade');
+    var status = root.querySelector('.paint-status');
+    var revealEl = root.querySelector('.paint-reveal');
+    var checkBtn = root.querySelector('[data-action="check"]');
+    var minCoverage = parseFloat(root.getAttribute('data-coverage')) || 0.9;
+    var zonesUrl = root.getAttribute('data-zones');
+    var reveal = JSON.parse(root.getAttribute('data-reveal'));
+    var ctx = layer.getContext('2d');
+    var zones = null;      // Uint8Array, flokkur hvers punkts
+    var allowed = null;    // canvas: ógegnsætt þar sem má lita
+    var tool = 'brush';
+    var size = 12;
+    var drawing = null;
+    var done = false;
+
+    function say(text, kind) {
+      status.textContent = text;
+      status.className = 'paint-status' + (kind ? ' ' + kind : '');
+    }
+
+    var img = new Image();
+    img.onload = function () {
+      var w = img.naturalWidth, h = img.naturalHeight;
+      layer.width = shade.width = w;
+      layer.height = shade.height = h;
+      var tmp = document.createElement('canvas');
+      tmp.width = w; tmp.height = h;
+      var t = tmp.getContext('2d');
+      t.drawImage(img, 0, 0);
+      var px = t.getImageData(0, 0, w, h).data;
+      zones = new Uint8Array(w * h);
+      allowed = document.createElement('canvas');
+      allowed.width = w; allowed.height = h;
+      var a = allowed.getContext('2d');
+      var aData = a.createImageData(w, h);
+      var sCtx = shade.getContext('2d');
+      var sData = sCtx.createImageData(w, h);
+      for (var i = 0; i < w * h; i++) {
+        var v = px[i * 4];
+        zones[i] = v < 40 ? 0 : v < 128 ? 1 : v < 212 ? 2 : 3;
+        if (zones[i] > 0) aData.data[i * 4 + 3] = 255;
+        else sData.data[i * 4 + 3] = 110;   // skyggja utan reits
+      }
+      a.putImageData(aData, 0, 0);
+      sCtx.putImageData(sData, 0, 0);
+    };
+    img.src = zonesUrl;
+
+    function point(e) {
+      var r = layer.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * layer.width / r.width,
+               y: (e.clientY - r.top) * layer.height / r.height };
+    }
+
+    function stroke(from, to) {
+      ctx.save();
+      ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
+      ctx.strokeStyle = ctx.fillStyle = '#ff2fd0';
+      ctx.lineWidth = size;
+      ctx.lineCap = ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x + 0.01, to.y);
+      ctx.stroke();
+      if (tool === 'brush' && allowed) {
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(allowed, 0, 0);
+      }
+      ctx.restore();
+    }
+
+    layer.addEventListener('pointerdown', function (e) {
+      if (done || !zones) return;
+      e.preventDefault();
+      layer.setPointerCapture(e.pointerId);
+      drawing = point(e);
+      stroke(drawing, drawing);
+      if (status.textContent) say('');
+    });
+    layer.addEventListener('pointermove', function (e) {
+      if (!drawing) return;
+      e.preventDefault();
+      var events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      if (!events.length) events = [e];
+      events.forEach(function (ev) {
+        var p = point(ev);
+        stroke(drawing, p);
+        drawing = p;
+      });
+    });
+    function end() { drawing = null; }
+    layer.addEventListener('pointerup', end);
+    layer.addEventListener('pointercancel', end);
+
+    function press(group, btn) {
+      root.querySelectorAll(group).forEach(function (b) { b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); });
+    }
+    root.querySelectorAll('[data-tool]').forEach(function (b) {
+      b.addEventListener('click', function () { tool = b.getAttribute('data-tool'); press('[data-tool]', b); });
+    });
+    root.querySelectorAll('[data-size]').forEach(function (b) {
+      b.addEventListener('click', function () { size = parseInt(b.getAttribute('data-size'), 10); press('[data-size]', b); });
+    });
+    root.querySelector('[data-action="clear"]').addEventListener('click', function () {
+      if (done) return;
+      ctx.clearRect(0, 0, layer.width, layer.height);
+      say('');
+    });
+
+    function unlock() {
+      var bin = atob(zonesUrl.split(',')[1]), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var subtle = window.crypto.subtle;
+      return subtle.digest('SHA-256', bytes)
+        .then(function (raw) { return subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']); })
+        .then(function (key) { return subtle.decrypt({ name: 'AES-GCM', iv: b64(reveal.iv) }, key, b64(reveal.data)); })
+        .then(function (buf) { return new TextDecoder().decode(buf); });
+    }
+
+    checkBtn.addEventListener('click', function () {
+      if (done || !zones) return;
+      var px = ctx.getImageData(0, 0, layer.width, layer.height).data;
+      var good = 0, total = 0, bad = 0, any = 0;
+      for (var i = 0; i < zones.length; i++) {
+        var painted = px[i * 4 + 3] >= 128;
+        if (zones[i] === 3) { total++; if (painted) good++; }
+        else if (zones[i] === 1 && painted) bad++;
+        if (painted) any++;
+      }
+      if (!any) { say('Litaðu fyrst lendingarsvæðið á kortið.', 'bad'); return; }
+      if (bad > 0) { say('Ekki alveg. Eitthvað af því sem þú litaðir hentar ekki til að varpa farminum niður.', 'bad'); return; }
+      if (good / total < minCoverage) { say('Ekki alveg. Lendingarsvæðið er stærra en það sem þú hefur litað.', 'bad'); return; }
+      done = true;
+      root.classList.add('done');
+      checkBtn.disabled = true;
+      unlock().then(function (html) {
+        say('Rétt! Þetta svæði hentar.', 'good');
+        revealEl.innerHTML = html;
+        revealEl.hidden = false;
+        revealEl.classList.add('reveal');
+        var input = taskEl.querySelector('.code-form input');
+        revealEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (input) input.focus({ preventScroll: true });
+      }, function () {
+        say('Eitthvað fór úrskeiðis. Endurhlaðaðu síðuna og reyndu aftur.', 'bad');
+      });
+    });
+  }
+
+  // 2. skref: kóði opnar næsta hluta (líka dulkóðaðan)
   function setupCodeForm() {
     var form = taskEl.querySelector('.code-form');
     var payloadEl = taskEl.querySelector('.next-payload');
