@@ -21,7 +21,7 @@
 // skref er geymt dulkóðað inni í því fyrra. Myndir og hljóð eru dulkóðuð með
 // lykli síns skrefs í sérstakar .bin-skrár. Ekkert af þessu sést í frumkóðanum.
 import { readFile, writeFile, mkdir, copyFile, access, readdir, rm } from 'node:fs/promises';
-import { webcrypto as crypto, createHash } from 'node:crypto';
+import { webcrypto as crypto, createHash, createHmac, randomBytes } from 'node:crypto';
 import { marked } from 'marked';
 
 const ITERATIONS = 250000;
@@ -53,6 +53,22 @@ function mimeOf(name) {
 }
 
 // --- Dulkóðun ---------------------------------------------------------------
+// Salt og IV eru leidd með HMAC af leynilykli í efni/.leyndarlykill. Þá verður
+// dulkóðunin eins í hverri byggingu ef efnið er óbreytt: skráarheiti haldast
+// og vafri sem geymir eldri útgáfu síðunnar í skyndiminni fær ekki villur.
+// Mismunandi efni fær alltaf mismunandi IV.
+
+const SECRET_FILE = `${SRC}/.leyndarlykill`;
+if (!await exists(SECRET_FILE)) {
+  await writeFile(SECRET_FILE, randomBytes(32).toString('hex') + '\n');
+  console.log(`Bjó til ${SECRET_FILE}. Geymdu hann með öðru efni í efni/.`);
+}
+const SECRET = (await readFile(SECRET_FILE, 'utf8')).trim();
+function derive(len, ...parts) {
+  const h = createHmac('sha256', SECRET);
+  for (const p of parts) { h.update(typeof p === 'string' ? enc.encode(p) : p); h.update('\0'); }
+  return new Uint8Array(h.digest().subarray(0, len));
+}
 
 async function deriveKey(password, salt) {
   const base = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
@@ -60,23 +76,23 @@ async function deriveKey(password, salt) {
     { name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256' },
     base, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
 }
-async function seal(key, bytes) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+async function seal(key, bytes, password) {
+  const iv = derive(12, 'iv', password, bytes);
   const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
   return { iv, data };
 }
 // Dulkóðar texta með lykilorði. Skilar því sem vafrinn þarf til að afkóða.
 async function encryptText(password, text) {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const salt = derive(16, 'salt', password);
   const key = await deriveKey(password, salt);
-  const { iv, data } = await seal(key, enc.encode(text));
+  const { iv, data } = await seal(key, enc.encode(text), password);
   return { key, payload: { iterations: ITERATIONS, salt: b64(salt), iv: b64(iv), data: b64(data) } };
 }
 // AES-GCM með lykli sem er SHA-256 af tilteknum bætum (notað fyrir litunaræfinguna).
 async function encryptWithBytes(bytes, text) {
   const raw = await crypto.subtle.digest('SHA-256', bytes);
   const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
-  const { iv, data } = await seal(key, enc.encode(text));
+  const { iv, data } = await seal(key, enc.encode(text), b64(new Uint8Array(raw)));
   return { iv: b64(iv), data: b64(data) };
 }
 
@@ -181,13 +197,13 @@ class Stage {
     const { key, payload } = await encryptText(password, '');
     let html = this.html;
     for (const a of this.assets) {
-      const { iv, data } = await seal(key, await readFile(await srcFile(a.name)));
+      const { iv, data } = await seal(key, await readFile(await srcFile(a.name)), password);
       const file = `${createHash('sha256').update(data).digest('hex').slice(0, 12)}.bin`;
       await writeFile(`${OUT}/${file}`, data);
       html = html.split(`data-asset="${a.id}"`).join(
         `data-enc="${file}" data-iv="${b64(iv)}" data-type="${a.type}"`);
     }
-    const { iv, data } = await seal(key, enc.encode(html));
+    const { iv, data } = await seal(key, enc.encode(html), password);
     payload.iv = b64(iv);
     payload.data = b64(data);
     return payload;
@@ -235,8 +251,13 @@ const payload = await stage1.seal(password);
 // Stafirnir fara í stafrófsröð inn í síðuna, ekki í réttri röð.
 payload.letters = sortedLetters(password);
 
+// Útgáfunúmer á app.js og style.css svo vafri noti ekki gamla útgáfu með nýrri síðu.
+const version = async (f) => createHash('sha256').update(await readFile(`src/${f}`)).digest('hex').slice(0, 10);
 const template = await readFile('src/index.html', 'utf8');
-await writeFile(`${OUT}/index.html`, template.replace('"__PAYLOAD__"', JSON.stringify(payload)));
+await writeFile(`${OUT}/index.html`, template
+  .replace('"__PAYLOAD__"', JSON.stringify(payload))
+  .replace('href="style.css"', `href="style.css?v=${await version('style.css')}"`)
+  .replace('src="app.js"', `src="app.js?v=${await version('app.js')}"`));
 for (const f of ['style.css', 'app.js', 'ernesto.jpg', 'ernesto.webp', 'saga.mp3']) {
   await copyFile(`src/${f}`, `${OUT}/${f}`);
 }
