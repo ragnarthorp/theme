@@ -1,5 +1,6 @@
 node_modules/
-# Lausnin og verkefnatextinn mega aldrei fara á GitHub
+# Lausnir, kóðar og verkefnatextar mega aldrei fara á GitHub
+efni/
 verkefni.md
 lykilord.txt
 .env

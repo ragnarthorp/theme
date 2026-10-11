@@ -20,18 +20,19 @@
   }
 
   // Leiðir lykil af orðinu og reynir að afkóða. Skilar HTML eða null.
-  function tryDecrypt(word) {
+  function tryDecrypt(word, payload) {
+    payload = payload || P;
     var subtle = window.crypto && window.crypto.subtle;
     if (!subtle) return Promise.reject(new Error('no-crypto'));
     var enc = new TextEncoder();
-    return subtle.importKey('raw', enc.encode(word.toLocaleLowerCase('is')), 'PBKDF2', false, ['deriveKey'])
+    return subtle.importKey('raw', enc.encode(word.replace(/\s+/g, '').toLocaleLowerCase('is')), 'PBKDF2', false, ['deriveKey'])
       .then(function (base) {
         return subtle.deriveKey(
-          { name: 'PBKDF2', salt: b64(P.salt), iterations: P.iterations, hash: 'SHA-256' },
+          { name: 'PBKDF2', salt: b64(payload.salt), iterations: payload.iterations, hash: 'SHA-256' },
           base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
       })
       .then(function (key) {
-        return subtle.decrypt({ name: 'AES-GCM', iv: b64(P.iv) }, key, b64(P.data));
+        return subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));
       })
       .then(function (buf) { return new TextDecoder().decode(buf); },
             function () { return null; });
@@ -131,6 +132,7 @@
         if (ok) setStatus(ok.textContent, 'good');
         taskEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         taskEl.focus({ preventScroll: true });
+        setupCodeForm();
       } else {
         setStatus('Ekki alveg. Hlustaðu aftur og reyndu á ný.', 'bad');
         slotsEl.classList.remove('shake');
@@ -140,6 +142,63 @@
     }, function () {
       busy = false;
       setStatus('Vafrinn styður ekki dulkóðun. Prófaðu nýrri vafra.', 'bad');
+    });
+  }
+
+  // 2. skref: kóði frá kennara opnar næsta hluta (líka dulkóðaðan)
+  function setupCodeForm() {
+    var form = taskEl.querySelector('.code-form');
+    var payloadEl = taskEl.querySelector('.next-payload');
+    if (!form || !payloadEl) return;
+    var next = JSON.parse(payloadEl.textContent);
+    var input = form.querySelector('input');
+    var button = form.querySelector('button');
+    var status = form.querySelector('.code-status');
+    var target = taskEl.querySelector('.next-stage');
+    var length = parseInt(form.getAttribute('data-length'), 10);
+    var checking = false;
+
+    function say(text, kind) {
+      status.textContent = text;
+      status.className = 'code-status' + (kind ? ' ' + kind : '');
+    }
+
+    function submit() {
+      var value = input.value.replace(/\s+/g, '');
+      if (checking) return;
+      if (value.length !== length) { say('Kóðinn er ' + length + ' stafir.', 'bad'); return; }
+      checking = true;
+      button.disabled = true;
+      say('Athuga…');
+      tryDecrypt(value, next).then(function (html) {
+        checking = false;
+        if (html) {
+          input.disabled = true;
+          say('Kóðinn er réttur!', 'good');
+          target.innerHTML = html;
+          target.hidden = false;
+          target.classList.add('reveal');
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          target.focus({ preventScroll: true });
+        } else {
+          button.disabled = false;
+          say('Þessi kóði passar ekki. Athugaðu hann og reyndu aftur.', 'bad');
+          form.classList.remove('shake');
+          void form.offsetWidth;
+          form.classList.add('shake');
+          input.select();
+        }
+      }, function () {
+        checking = false;
+        button.disabled = false;
+        say('Vafrinn styður ekki dulkóðun. Prófaðu nýrri vafra.', 'bad');
+      });
+    }
+
+    form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
+    input.addEventListener('input', function () {
+      input.value = input.value.toLocaleUpperCase('is');
+      if (status.textContent && !checking) say('');
     });
   }
 
