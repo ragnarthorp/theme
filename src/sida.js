@@ -32,6 +32,7 @@
       el.classList.add('reveal');
       setupMore();
       setupGods();
+      setupZoom();
       el.querySelectorAll('[data-enc]').forEach(function (node) {
         fetch(node.getAttribute('data-enc'))
           .then(function (res) { if (!res.ok) throw new Error(res.status); return res.arrayBuffer(); })
@@ -42,6 +43,28 @@
     }, function () {
       fail('Þessi hlekkur er ekki réttur. Fáðu réttan hlekk hjá kennaranum.');
     });
+
+  // Pikk á skjámynd sýnir hana stóra; pikk aftur lokar.
+  function setupZoom() {
+    el.querySelectorAll('figure img').forEach(function (img) {
+      img.addEventListener('click', function () {
+        if (!img.src) return;
+        var box = document.createElement('div');
+        box.className = 'zoom';
+        box.setAttribute('role', 'dialog');
+        box.setAttribute('aria-label', img.alt);
+        var big = document.createElement('img');
+        big.src = img.src;
+        big.alt = img.alt;
+        box.appendChild(big);
+        box.addEventListener('click', function () { box.remove(); });
+        document.addEventListener('keydown', function esc(e) {
+          if (e.key === 'Escape') { box.remove(); document.removeEventListener('keydown', esc); }
+        });
+        document.body.appendChild(box);
+      });
+    });
+  }
 
   // „Áfram“ og „Þýða þetta á mannamál“: sýna næsta hluta á sömu síðu.
   function setupMore() {
