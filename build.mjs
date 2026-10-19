@@ -41,11 +41,6 @@ const enc = new TextEncoder();
 
 function fail(msg) { console.error(msg); process.exit(1); }
 
-async function srcFile(name) {
-  const path = `${SRC}/${decodeURI(name)}`;
-  if (!await exists(path)) fail(`Fannst ekki: ${path}`);
-  return path;
-}
 function mimeOf(name) {
   const type = MIME[name.split('.').pop().toLowerCase()];
   if (!type) fail(`Óþekkt skráargerð: ${name}`);
@@ -101,7 +96,13 @@ async function encryptWithBytes(bytes, text) {
 // dulkóðuð með lykli skrefsins þegar hann er þekktur.
 
 class Stage {
-  constructor() { this.assets = []; }
+  constructor(base = SRC, out = OUT) { this.assets = []; this.base = base; this.out = out; }
+
+  async file(name) {
+    const path = `${this.base}/${decodeURI(name)}`;
+    if (!await exists(path)) fail(`Fannst ekki: ${path}`);
+    return path;
+  }
 
   asset(name, type) {
     const id = `a${this.assets.length}`;
@@ -110,7 +111,7 @@ class Stage {
   }
 
   async render(file, code) {
-    let html = marked.parse(await readFile(`${SRC}/${file}`, 'utf8'));
+    let html = marked.parse(await readFile(await this.file(file), 'utf8'));
 
     // Myndir
     html = html.replace(/<img ([^>]*?)src="([^"]+)"([^>]*)>/g, (m, a, src, b) =>
@@ -124,7 +125,7 @@ class Stage {
     for (const m of [...html.matchAll(/<!--\s*litakort:\s*(\S+)\s+(\S+)\s*-->/g)]) {
       const [, image, zones] = m;
       if (!code) fail('Litunaræfing þarf kóða í efni/kodi.txt.');
-      const zoneBytes = await readFile(await srcFile(zones));
+      const zoneBytes = await readFile(await this.file(zones));
       const reveal = await encryptWithBytes(zoneBytes,
         `<p class="paint-code">Lendingarsvæðið er gott! Kóðinn ykkar er <strong>${escapeHtml(code.toLocaleUpperCase('is'))}</strong></p>`);
       html = html.replace(m[0], `
@@ -176,7 +177,7 @@ class Stage {
     // Val: hnappar sem opnast þegar öll stafarugl skrefsins eru leyst.
     for (const m of [...html.matchAll(/<!--\s*val:\s*(\S+)\s*-->/g)]) {
       if (!answers.length) fail('<!-- val --> þarf a.m.k. eitt stafarugl í sama texta.');
-      const lines = (await readFile(await srcFile(m[1]), 'utf8')).split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+      const lines = (await readFile(await this.file(m[1]), 'utf8')).split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
       const buttons = lines.map((line, i) => {
         const [name, sub, url] = line.split('|').map((s) => s.trim());
         if (!name || !url) fail(`Ógild lína í ${m[1]}: ${line}`);
@@ -188,21 +189,43 @@ class Stage {
       html = html.replace(m[0], `<div class="choice" hidden tabindex="-1" data-payload="${escapeHtml(JSON.stringify(payload))}"></div>`);
     }
 
+    // Handrit sem hægt er að opna. [leiðbeiningar] eru sýndar daufar.
+    for (const m of [...html.matchAll(/<!--\s*handrit:\s*(\S+)\s*-->/g)]) {
+      const text = marked.parse(await readFile(await this.file(m[1]), 'utf8'))
+        .replace(/\[([^\]<>]+)\](?!\()/g, '<span class="cue">[$1]</span>');
+      html = html.replace(m[0], `<details class="script"><summary>Lesa handritið</summary>\n<div class="script-body">${text}</div></details>`);
+    }
+
+    // Áfram-hnappur
+    html = html.replace(/<!--\s*afram:\s*(\S+)\s*-->/g, (m, url) =>
+      `<p class="forward"><a class="forward-btn" href="${escapeHtml(url)}">Áfram</a></p>`);
+
     this.html = html;
     return this;
+  }
+
+  // Dulkóðar með hráum lykli (undirsíður: lykillinn er í slóðinni á eftir #).
+  async sealWithKey(raw) {
+    const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+    const label = b64(raw);
+    let html = this.html;
+    for (const a of this.assets) html = html.split(`data-asset="${a.id}"`).join(await this.writeAsset(key, a, label));
+    const { iv, data } = await seal(key, enc.encode(html), label);
+    return { iv: b64(iv), data: b64(data) };
+  }
+
+  async writeAsset(key, a, label) {
+    const { iv, data } = await seal(key, await readFile(await this.file(a.name)), label);
+    const file = `${createHash('sha256').update(data).digest('hex').slice(0, 12)}.bin`;
+    await writeFile(`${this.out}/${file}`, data);
+    return `data-enc="${file}" data-iv="${b64(iv)}" data-type="${a.type}"`;
   }
 
   // Dulkóðar textann og skrifar myndir og hljóð dulkóðuð í docs/.
   async seal(password) {
     const { key, payload } = await encryptText(password, '');
     let html = this.html;
-    for (const a of this.assets) {
-      const { iv, data } = await seal(key, await readFile(await srcFile(a.name)), password);
-      const file = `${createHash('sha256').update(data).digest('hex').slice(0, 12)}.bin`;
-      await writeFile(`${OUT}/${file}`, data);
-      html = html.split(`data-asset="${a.id}"`).join(
-        `data-enc="${file}" data-iv="${b64(iv)}" data-type="${a.type}"`);
-    }
+    for (const a of this.assets) html = html.split(`data-asset="${a.id}"`).join(await this.writeAsset(key, a, password));
     const { iv, data } = await seal(key, enc.encode(html), password);
     payload.iv = b64(iv);
     payload.data = b64(data);
@@ -258,8 +281,39 @@ await writeFile(`${OUT}/index.html`, template
   .replace('"__PAYLOAD__"', JSON.stringify(payload))
   .replace('href="style.css"', `href="style.css?v=${await version('style.css')}"`)
   .replace('src="app.js"', `src="app.js?v=${await version('app.js')}"`));
-for (const f of ['style.css', 'app.js', 'ernesto.jpg', 'ernesto.webp', 'saga.mp3']) {
+for (const f of ['style.css', 'app.js', 'sida.js', 'ernesto.jpg', 'ernesto.webp', 'saga.mp3']) {
   await copyFile(`src/${f}`, `${OUT}/${f}`);
+}
+
+// --- Undirsíður -------------------------------------------------------------------
+// Hver mappa í efni/sidur/ verður að síðu í docs/<mappa>/. Efnið er dulkóðað með
+// slembilykli úr lykill.txt (búinn til sjálfkrafa), og lykillinn er aðeins í
+// hlekknum sjálfum á eftir #: hann fer hvorki á netþjóninn né á GitHub.
+const links = [];
+const pagesDir = `${SRC}/sidur`;
+const pageTemplate = await readFile('src/sida.html', 'utf8');
+const slugs = (await exists(pagesDir)) ? (await readdir(pagesDir, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name) : [];
+for (const slug of await readdir(OUT, { withFileTypes: true })) {
+  if (slug.isDirectory() && !slugs.includes(slug.name)) await rm(`${OUT}/${slug.name}`, { recursive: true });
+}
+for (const slug of slugs) {
+  if (!/^[a-z0-9-]+$/.test(slug)) fail(`Heiti undirsíðu má aðeins innihalda a–z, 0–9 og -: ${slug}`);
+  const dir = `${pagesDir}/${slug}`, out = `${OUT}/${slug}`;
+  if (!await exists(`${dir}/lykill.txt`)) await writeFile(`${dir}/lykill.txt`, Buffer.from(randomBytes(16)).toString('base64url') + '\n');
+  const raw = new Uint8Array(Buffer.from((await readFile(`${dir}/lykill.txt`, 'utf8')).trim(), 'base64url'));
+  if (raw.length !== 16 && raw.length !== 32) fail(`Ógildur lykill í ${dir}/lykill.txt`);
+  await mkdir(out, { recursive: true });
+  for (const f of await readdir(out)) if (f.endsWith('.bin')) await rm(`${out}/${f}`);
+  const page = await (await new Stage(dir, out).render('sida.md')).sealWithKey(raw);
+  await writeFile(`${out}/index.html`, pageTemplate
+    .replace('"__PAYLOAD__"', JSON.stringify(page))
+    .replace('href="../style.css"', `href="../style.css?v=${await version('style.css')}"`)
+    .replace('src="../sida.js"', `src="../sida.js?v=${await version('sida.js')}"`));
+  links.push(`docs/${slug}/  →  https://ragnarthorp.github.io/theme/${slug}/#k=${Buffer.from(raw).toString('base64url')}`);
+}
+if (links.length) {
+  await writeFile(`${SRC}/hlekkir.txt`, links.join('\n') + '\n');
+  console.log(`Undirsíður (hlekkirnir eru líka í ${SRC}/hlekkir.txt):\n  ` + links.join('\n  '));
 }
 await writeFile(`${OUT}/.nojekyll`, '');
 console.log(`Síðan byggð í ${OUT}/: ${payload.letters.length} stafir í þrautinni` +

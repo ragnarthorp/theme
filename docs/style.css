@@ -258,6 +258,37 @@ button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
   .team { min-height: 88px; }
 }
 
+.page audio { width: 100%; margin: 4px 0 8px; }
+.page .status { text-align: left; }
+.page.reveal { animation: reveal .7s ease-out both; }
+
+.script { margin: 20px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.script summary {
+  min-height: 52px; padding: 14px 18px; display: flex; align-items: center;
+  font-weight: 700; cursor: pointer; touch-action: manipulation;
+  list-style: none; color: var(--sky);
+}
+.script summary::-webkit-details-marker { display: none; }
+.script summary::before { content: "▸"; margin-right: 10px; transition: transform .2s; }
+.script[open] summary::before { transform: rotate(90deg); }
+.script summary:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; border-radius: 12px; }
+.script-body { padding: 0 20px 8px; font-size: 1.1rem; }
+.script-body p { margin: 0 0 14px; }
+.cue { color: var(--muted); font-style: italic; font-size: .92em; }
+
+.forward { display: flex; justify-content: flex-end; margin: 28px 0 4px; }
+.forward-btn {
+  display: inline-flex; align-items: center; min-height: 56px; padding: 0 34px;
+  font: 700 1.25rem/1 "Source Sans 3", system-ui, sans-serif;
+  color: var(--tile-ink); background: var(--tile);
+  border-radius: 12px; box-shadow: var(--shadow); text-decoration: none;
+  touch-action: manipulation;
+}
+.task .forward-btn { color: var(--tile-ink); }
+.forward-btn::after { content: "→"; margin-left: 12px; }
+.forward-btn:active { transform: translateY(2px); box-shadow: none; }
+.forward-btn:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+
 @media print {
   .hero, .audio, .puzzle, .code-form { display: none; }
   body { background: #fff; color: #000; }
@@ -265,5 +296,5 @@ button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slots.shake, .task.reveal, .code-form.shake, .next-stage.reveal, .paint-reveal.reveal, .choice.reveal { animation: none; }
+  .slots.shake, .task.reveal, .code-form.shake, .next-stage.reveal, .paint-reveal.reveal, .choice.reveal, .page.reveal { animation: none; }
 }

@@ -39,8 +39,14 @@ Hvert skref er dulkóðað og næsta skref er geymt dulkóðað inni í því fy
 | `<!-- stafarugl: Spurning \| SVAR -->` | stafarugl |
 | `<!-- val: hopar.txt -->` | hnappar sem opnast þegar öll stafarugl sama texta eru leyst |
 
+## Undirsíður
+
+Hver mappa í `efni/sidur/` verður að sérstakri síðu, ótengdri aðalsíðunni, t.d. `efni/sidur/talstod/` → `docs/talstod/`. Í möppunni er `sida.md` (sömu sérstöku línur og að ofan, auk `<!-- handrit: skra.md -->` fyrir handrit sem hægt er að opna og `<!-- afram: slóð -->` fyrir Áfram-hnapp) og myndir og hljóð sem hún vísar í.
+
+Efnið er dulkóðað með slembilykli sem byggingin býr til í `lykill.txt`. Lykillinn er aðeins í hlekknum, á eftir `#k=`, og fer hvorki á netþjóninn né á GitHub. Byggingin skrifar alla hlekki í `efni/hlekkir.txt`. Ef þú eyðir `lykill.txt` fær síðan nýjan lykil og gamli hlekkurinn hættir að virka.
+
 ## Skrár
 
-- `src/`: sniðmát síðunnar, stílsnið, JavaScript, mynd af Ernesto og hljóð
+- `src/`: sniðmát síðunnar og undirsíðna (`sida.html`, `sida.js`), stílsnið, JavaScript, mynd af Ernesto og hljóð
 - `build.mjs`: byggingarskriftan (`npm run build`)
 - `docs/`: útgefna síðan
