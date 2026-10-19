@@ -205,6 +205,9 @@ class Stage {
       html = html.replace(m[0], `<details class="script"><summary>Lesa handritið</summary>\n<div class="script-body">${text}</div></details>`);
     }
 
+    // Tenglar á aðrar undirsíður: href="sida:heiti" fær réttan lykil
+    html = html.replace(/href="(sida:[a-z0-9-]+)"/g, (m, url) => `href="${escapeHtml(resolveUrl(url))}"`);
+
     // Áfram-hnappur
     html = html.replace(/<!--\s*afram:\s*(\S+)\s*-->/g, (m, url) =>
       `<p class="forward"><a class="forward-btn" href="${escapeHtml(resolveUrl(url))}">Áfram</a></p>`);
