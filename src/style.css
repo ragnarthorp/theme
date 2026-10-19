@@ -379,6 +379,7 @@ body:has(.cheat) main { max-width: 1040px; }
 .step-text > :last-child { margin-bottom: 0; }
 .step figure { margin: 0; }
 .task .step figure img { margin: 0; cursor: zoom-in; }
+.task .step figure img + img { margin-top: 12px; }
 .step figcaption { margin-top: 6px; font-size: .9rem; color: var(--muted); text-align: center; }
 .link-btn {
   display: inline-flex; align-items: center; min-height: 48px; padding: 0 20px;
@@ -417,6 +418,23 @@ body:has(.cheat) main { max-width: 1040px; }
 .codes td { padding: 4px 0; font: 700 1.05rem/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .05em; color: var(--earth); }
 .tasks { margin: 0 0 12px; padding-left: 1.4em; }
 .tasks li, .step ul li { margin-bottom: 6px; }
+.note.warn { border-left-color: var(--bad); background: color-mix(in srgb, var(--bad) 9%, var(--bg)); }
+.note.warn .note-title { color: var(--bad); text-transform: uppercase; letter-spacing: .05em; font-size: .9rem; }
+.rules { margin: 12px 0 0; padding-left: 1.2em; font-size: .95em; color: var(--muted); }
+.step figure img + img { margin-top: 12px; }
+.milestone {
+  position: relative; margin: 0 0 20px; padding: 22px 26px;
+  border-radius: 14px; border: 2px dashed var(--earth);
+  background: color-mix(in srgb, var(--earth) 7%, var(--bg));
+}
+.milestone-title {
+  margin: 0 0 8px !important; font: 600 1.45rem/1.2 Fraunces, Georgia, serif; color: var(--earth);
+}
+.milestone-title::before { content: "✓ "; }
+.milestone p { margin: 0 0 10px; }
+.milestone ol { margin: 0 0 12px; padding-left: 1.4em; }
+.milestone li { margin-bottom: 6px; }
+.milestone-grade { margin-bottom: 0 !important; font-weight: 600; }
 .cheat-foot { text-align: center; color: var(--muted); font-style: italic; margin: 8px 0 0; }
 
 .zoom {
