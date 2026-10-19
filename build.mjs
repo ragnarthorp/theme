@@ -91,6 +91,15 @@ async function encryptWithBytes(bytes, text) {
   return { iv: b64(iv), data: b64(data) };
 }
 
+// Slóð á undirsíðu (frá annarri undirsíðu): sida:heiti → ../heiti/#k=lykill
+const pageKeys = new Map();
+function resolveUrl(url) {
+  const m = /^sida:([a-z0-9-]+)$/.exec(url);
+  if (!m) return url;
+  if (!pageKeys.has(m[1])) fail(`Engin undirsíða heitir ${m[1]} (efni/sidur/${m[1]}/ vantar).`);
+  return `../${m[1]}/#k=${Buffer.from(pageKeys.get(m[1])).toString('base64url')}`;
+}
+
 // --- Eitt skref ---------------------------------------------------------------
 // Skref er búið til úr markdown-skrá. Myndir og hljóð eru sett í "assets" og
 // dulkóðuð með lykli skrefsins þegar hann er þekktur.
@@ -198,7 +207,25 @@ class Stage {
 
     // Áfram-hnappur
     html = html.replace(/<!--\s*afram:\s*(\S+)\s*-->/g, (m, url) =>
-      `<p class="forward"><a class="forward-btn" href="${escapeHtml(url)}">Áfram</a></p>`);
+      `<p class="forward"><a class="forward-btn" href="${escapeHtml(resolveUrl(url))}">Áfram</a></p>`);
+
+    // Guðanöfn í bakgrunni: aðeins rétta nafnið opnar slóðina (athugað með afkóðun).
+    for (const m of [...html.matchAll(/<!--\s*gudir:\s*(\S+)\s*->\s*(\S+)\s*-->/g)]) {
+      const [, name, url] = m;
+      const { payload } = await encryptText(name, resolveUrl(url));
+      const names = [...GODS, name];
+      html = html.replace(m[0], `<div class="gods" aria-hidden="true" data-names="${escapeHtml(names.join(' '))}" data-payload="${escapeHtml(JSON.stringify(payload))}"></div>`);
+    }
+
+    // Birta meira: allt á eftir <!-- birta: Texti á hnappi --> er falið þar til smellt er.
+    const parts = html.split(/<!--\s*birta:\s*(.+?)\s*-->/);
+    let rest = parts[parts.length - 1];
+    for (let i = parts.length - 2; i >= 1; i -= 2) {
+      rest = parts[i - 1] +
+        `<p class="more-row"><button type="button" class="more-btn">${escapeHtml(parts[i])}</button></p>\n` +
+        `<div class="more" hidden>\n${rest}\n</div>`;
+    }
+    html = rest;
 
     this.html = html;
     return this;
@@ -232,6 +259,12 @@ class Stage {
     return payload;
   }
 }
+
+// Nöfn grískra guða og gyðja (hástafir án áherslumerkja) fyrir bakgrunn.
+const GODS = ['ΗΡΑ', 'ΠΟΣΕΙΔΩΝ', 'ΑΘΗΝΑ', 'ΑΠΟΛΛΩΝ', 'ΑΡΤΕΜΙΣ', 'ΑΡΗΣ', 'ΑΦΡΟΔΙΤΗ', 'ΗΦΑΙΣΤΟΣ',
+  'ΕΡΜΗΣ', 'ΔΗΜΗΤΗΡ', 'ΔΙΟΝΥΣΟΣ', 'ΕΣΤΙΑ', 'ΑΔΗΣ', 'ΠΕΡΣΕΦΟΝΗ', 'ΕΡΩΣ', 'ΓΑΙΑ', 'ΚΡΟΝΟΣ', 'ΡΕΑ',
+  'ΝΙΚΗ', 'ΗΩΣ', 'ΗΛΙΟΣ', 'ΣΕΛΗΝΗ', 'ΠΑΝ', 'ΗΒΗ', 'ΙΡΙΣ', 'ΟΥΡΑΝΟΣ', 'ΠΡΟΜΗΘΕΥΣ', 'ΑΤΛΑΣ',
+  'ΘΕΜΙΣ', 'ΜΝΗΜΟΣΥΝΗ', 'ΝΕΜΕΣΙΣ', 'ΤΥΧΗ', 'ΜΟΡΦΕΥΣ', 'ΥΠΝΟΣ'];
 
 function sortedLetters(word) {
   return [...word.toLocaleUpperCase('is')].sort((a, b) => a.localeCompare(b, 'is'));
@@ -296,12 +329,18 @@ const slugs = (await exists(pagesDir)) ? (await readdir(pagesDir, { withFileType
 for (const slug of await readdir(OUT, { withFileTypes: true })) {
   if (slug.isDirectory() && !slugs.includes(slug.name)) await rm(`${OUT}/${slug.name}`, { recursive: true });
 }
+// Lyklar allra undirsíðna fyrst, svo síður geti vísað hver á aðra með sida:<heiti>.
 for (const slug of slugs) {
   if (!/^[a-z0-9-]+$/.test(slug)) fail(`Heiti undirsíðu má aðeins innihalda a–z, 0–9 og -: ${slug}`);
+  const file = `${pagesDir}/${slug}/lykill.txt`;
+  if (!await exists(file)) await writeFile(file, Buffer.from(randomBytes(16)).toString('base64url') + '\n');
+  const raw = new Uint8Array(Buffer.from((await readFile(file, 'utf8')).trim(), 'base64url'));
+  if (raw.length !== 16 && raw.length !== 32) fail(`Ógildur lykill í ${file}`);
+  pageKeys.set(slug, raw);
+}
+for (const slug of slugs) {
   const dir = `${pagesDir}/${slug}`, out = `${OUT}/${slug}`;
-  if (!await exists(`${dir}/lykill.txt`)) await writeFile(`${dir}/lykill.txt`, Buffer.from(randomBytes(16)).toString('base64url') + '\n');
-  const raw = new Uint8Array(Buffer.from((await readFile(`${dir}/lykill.txt`, 'utf8')).trim(), 'base64url'));
-  if (raw.length !== 16 && raw.length !== 32) fail(`Ógildur lykill í ${dir}/lykill.txt`);
+  const raw = pageKeys.get(slug);
   await mkdir(out, { recursive: true });
   for (const f of await readdir(out)) if (f.endsWith('.bin')) await rm(`${out}/${f}`);
   const page = await (await new Stage(dir, out).render('sida.md')).sealWithKey(raw);

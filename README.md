@@ -41,7 +41,14 @@ Hvert skref er dulkóðað og næsta skref er geymt dulkóðað inni í því fy
 
 ## Undirsíður
 
-Hver mappa í `efni/sidur/` verður að sérstakri síðu, ótengdri aðalsíðunni, t.d. `efni/sidur/talstod/` → `docs/talstod/`. Í möppunni er `sida.md` (sömu sérstöku línur og að ofan, auk `<!-- handrit: skra.md -->` fyrir handrit sem hægt er að opna og `<!-- afram: slóð -->` fyrir Áfram-hnapp) og myndir og hljóð sem hún vísar í.
+Hver mappa í `efni/sidur/` verður að sérstakri síðu, ótengdri aðalsíðunni, t.d. `efni/sidur/talstod/` → `docs/talstod/`. Í möppunni er `sida.md` og myndir og hljóð sem hún vísar í. Í `sida.md` virka sömu sérstöku línur og að ofan, auk:
+
+| Lína | Hvað hún gerir |
+| --- | --- |
+| `<!-- handrit: skra.md -->` | handrit sem hægt er að opna; [leiðbeiningar] í hornklofum birtast daufar |
+| `<!-- afram: slóð -->` | Áfram-hnappur. `sida:heiti` vísar á aðra undirsíðu með réttum lykli |
+| `<!-- birta: Texti á hnappi -->` | allt sem kemur á eftir er falið þar til smellt er á hnappinn |
+| `<!-- gudir: NAFN -> slóð -->` | bakgrunnur þakinn grískum guðanöfnum; aðeins NAFN opnar slóðina |
 
 Efnið er dulkóðað með slembilykli sem byggingin býr til í `lykill.txt`. Lykillinn er aðeins í hlekknum, á eftir `#k=`, og fer hvorki á netþjóninn né á GitHub. Byggingin skrifar alla hlekki í `efni/hlekkir.txt`. Ef þú eyðir `lykill.txt` fær síðan nýjan lykil og gamli hlekkurinn hættir að virka.
 

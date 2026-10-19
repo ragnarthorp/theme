@@ -289,6 +289,44 @@ button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
 .forward-btn:active { transform: translateY(2px); box-shadow: none; }
 .forward-btn:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
 
+.more-row { display: flex; justify-content: flex-end; margin: 24px 0 4px; }
+.more-btn {
+  min-height: 56px; padding: 0 30px;
+  font: 700 1.2rem/1 "Source Sans 3", system-ui, sans-serif;
+  color: var(--tile-ink); background: var(--tile);
+  border: none; border-radius: 12px; box-shadow: var(--shadow);
+  cursor: pointer; touch-action: manipulation;
+}
+.more-btn:active { transform: translateY(2px); box-shadow: none; }
+.more-btn:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+.more { padding-top: 8px; }
+.more:focus, .more > :focus { outline: none; }
+.more.reveal { animation: reveal .7s ease-out both; }
+.more .more-row { justify-content: center; }
+.more .more .more-row { justify-content: flex-end; }
+
+/* Síða með guðanöfnum í bakgrunni */
+.has-gods main { position: relative; z-index: 1; max-width: 640px; padding-bottom: 50vh; pointer-events: none; }
+.has-gods main > * { pointer-events: auto; }
+.has-gods main h1 { pointer-events: none; }
+.has-gods .page { background: color-mix(in srgb, var(--surface) 90%, transparent); }
+.page > :first-child { margin-top: 0; }
+.gods-field { position: absolute; top: 0; left: 0; right: 0; overflow: hidden; z-index: 0; }
+.god {
+  position: absolute; transform: translate(-50%, -50%) rotate(var(--rot, 0deg));
+  padding: 6px 4px; background: none; border: none; cursor: pointer;
+  font-family: Fraunces, Georgia, serif; font-weight: 600; letter-spacing: .08em;
+  color: var(--muted); opacity: .26; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.god.trying { opacity: .6; }
+.god.miss { animation: god-miss .5s ease-out; }
+@keyframes god-miss {
+  0%, 100% { transform: translate(-50%, -50%) rotate(var(--rot, 0deg)); }
+  30% { transform: translate(-56%, -50%) rotate(var(--rot, 0deg)); }
+  60% { transform: translate(-45%, -50%) rotate(var(--rot, 0deg)); }
+}
+
 @media print {
   .hero, .audio, .puzzle, .code-form { display: none; }
   body { background: #fff; color: #000; }
@@ -296,5 +334,5 @@ button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slots.shake, .task.reveal, .code-form.shake, .next-stage.reveal, .paint-reveal.reveal, .choice.reveal, .page.reveal { animation: none; }
+  .slots.shake, .task.reveal, .code-form.shake, .next-stage.reveal, .paint-reveal.reveal, .choice.reveal, .page.reveal, .more.reveal, .god.miss { animation: none; }
 }
