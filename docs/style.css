@@ -99,6 +99,7 @@ section {
 }
 .tile:active { transform: translateY(2px); box-shadow: none; }
 .tile.used { visibility: hidden; }
+.bank.pending { opacity: .4; }
 
 /* Á mjóum skjá komast tíu hólf í tvær línur */
 @media (max-width: 720px) {

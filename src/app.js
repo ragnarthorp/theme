@@ -180,20 +180,32 @@
       });
     }
 
-    // Stokkar og passar að upphafsröðin sé aldrei rétta orðið
-    // (prófað með því að reyna að afkóða, ekkert svar er geymt).
+    // Stokkar og passar að upphafsröðin sé aldrei rétta orðið (prófað með því
+    // að reyna að afkóða, ekkert svar er geymt). Stafirnir birtast fyrst þegar
+    // röðin hefur verið staðfest, svo þeir hoppa aldrei til eftir á.
     function newRound() {
       if (solved) return;
-      busy = false;
+      busy = true;
       slotsEl.classList.remove('shake');
       setStatus('');
-      var order = shuffle(letters);
       var mine = ++round;
-      build(order);
-      check(order.join('')).then(function (result) {
-        var untouched = tiles.every(function (t) { return t.slot === null; });
-        if (result && mine === round && untouched) newRound();
-      }, function () {});
+      bankEl.classList.add('pending');
+      function attempt(tries) {
+        var order = shuffle(letters);
+        check(order.join('')).then(function (result) {
+          if (mine !== round) return;
+          if (result && tries < 20) { attempt(tries + 1); return; }
+          busy = false;
+          bankEl.classList.remove('pending');
+          build(order);
+        }, function () {
+          if (mine !== round) return;
+          busy = false;
+          bankEl.classList.remove('pending');
+          build(order);
+        });
+      }
+      attempt(0);
     }
 
     resetBtn.addEventListener('click', newRound);
