@@ -52,6 +52,12 @@ Hver mappa í `efni/sidur/` verður að sérstakri síðu, ótengdri aðalsíðu
 
 Efnið er dulkóðað með slembilykli sem byggingin býr til í `lykill.txt`. Lykillinn er aðeins í hlekknum, á eftir `#k=`, og fer hvorki á netþjóninn né á GitHub. Byggingin skrifar alla hlekki í `efni/hlekkir.txt`. Ef þú eyðir `lykill.txt` fær síðan nýjan lykil og gamli hlekkurinn hættir að virka.
 
+## Kyrrar síður
+
+Hver mappa í `kyrrt/` er afrituð óbreytt í `docs/<mappa>/` við byggingu. Þær eru hvorki dulkóðaðar né tengdar aðalsíðunni.
+
+- `kyrrt/skutlur/`: yfirlit yfir skýrslur nemenda úr skutlutilrauninni (Þemadagar – Eðlisfræði), https://ragnarthorp.github.io/theme/skutlur/. Gögnin eru í `skyrslur.js`; nöfn nemenda eru ekki birt.
+
 ## Skrár
 
 - `src/`: sniðmát síðunnar og undirsíðna (`sida.html`, `sida.js`), stílsnið, JavaScript, mynd af Ernesto og hljóð
