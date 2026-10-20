@@ -20,7 +20,7 @@
 // Hvert skref er dulkóðað (AES-GCM, lykill leiddur með PBKDF2/SHA-256) og næsta
 // skref er geymt dulkóðað inni í því fyrra. Myndir og hljóð eru dulkóðuð með
 // lykli síns skrefs í sérstakar .bin-skrár. Ekkert af þessu sést í frumkóðanum.
-import { readFile, writeFile, mkdir, copyFile, access, readdir, rm } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, access, readdir, rm, cp } from 'node:fs/promises';
 import { webcrypto as crypto, createHash, createHmac, randomBytes } from 'node:crypto';
 import { marked } from 'marked';
 
@@ -329,9 +329,14 @@ const links = [];
 const pagesDir = `${SRC}/sidur`;
 const pageTemplate = await readFile('src/sida.html', 'utf8');
 const slugs = (await exists(pagesDir)) ? (await readdir(pagesDir, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name) : [];
+// Kyrrar síður: hver mappa í kyrrt/ er afrituð óbreytt í docs/<mappa>/ (ekki dulkóðuð).
+const STATIC = 'kyrrt';
+const staticSlugs = (await exists(STATIC)) ? (await readdir(STATIC, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name) : [];
+for (const slug of staticSlugs) if (slugs.includes(slug)) fail(`Sama heiti í ${SRC}/sidur/ og ${STATIC}/: ${slug}`);
 for (const slug of await readdir(OUT, { withFileTypes: true })) {
-  if (slug.isDirectory() && !slugs.includes(slug.name)) await rm(`${OUT}/${slug.name}`, { recursive: true });
+  if (slug.isDirectory() && !slugs.includes(slug.name) && !staticSlugs.includes(slug.name)) await rm(`${OUT}/${slug.name}`, { recursive: true });
 }
+for (const slug of staticSlugs) await cp(`${STATIC}/${slug}`, `${OUT}/${slug}`, { recursive: true });
 // Lyklar allra undirsíðna fyrst, svo síður geti vísað hver á aðra með sida:<heiti>.
 for (const slug of slugs) {
   if (!/^[a-z0-9-]+$/.test(slug)) fail(`Heiti undirsíðu má aðeins innihalda a–z, 0–9 og -: ${slug}`);
