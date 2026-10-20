@@ -474,6 +474,12 @@ body:has(.cheat) main { max-width: 1040px; }
 .grade-ticks span:first-child { transform: none; }
 .grade-ticks span:last-child { transform: translateX(-100%); }
 .final-next { margin: 18px 0 0; font-weight: 700; text-align: center; color: var(--sky); }
+.day-divider {
+  display: flex; align-items: center; gap: 16px; margin: 36px 0 22px;
+  font: 600 1.6rem/1.2 Fraunces, Georgia, serif; color: var(--earth);
+}
+.day-divider::before, .day-divider::after { content: ""; flex: 1; height: 3px; border-radius: 2px; background: var(--earth); opacity: .4; }
+.steps-day2 { counter-reset: step 19; }
 .cheat-foot { text-align: center; color: var(--muted); font-style: italic; margin: 8px 0 0; }
 
 .zoom {
@@ -681,6 +687,7 @@ body:has(.smidja) main { max-width: 980px; }
   .hero, .audio, .puzzle, .code-form, .link-btn { display: none; }
   body:has(.cheat) main > header { display: none; }
   .step, .challenge, .score, .milestone { break-inside: avoid; }
+  .day-divider { break-before: page; }
   body { background: #fff; color: #000; }
   section { border: none; padding: 0; }
 }
