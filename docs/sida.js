@@ -33,6 +33,7 @@
       setupMore();
       setupGods();
       setupZoom();
+      if (window.initWidgets) window.initWidgets(el);
       el.querySelectorAll('[data-enc]').forEach(function (node) {
         fetch(node.getAttribute('data-enc'))
           .then(function (res) { if (!res.ok) throw new Error(res.status); return res.arrayBuffer(); })

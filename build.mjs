@@ -317,7 +317,7 @@ await writeFile(`${OUT}/index.html`, template
   .replace('"__PAYLOAD__"', JSON.stringify(payload))
   .replace('href="style.css"', `href="style.css?v=${await version('style.css')}"`)
   .replace('src="app.js"', `src="app.js?v=${await version('app.js')}"`));
-for (const f of ['style.css', 'app.js', 'sida.js', 'ernesto.jpg', 'ernesto.webp', 'saga.mp3']) {
+for (const f of ['style.css', 'app.js', 'sida.js', 'smidja.js', 'ernesto.jpg', 'ernesto.webp', 'saga.mp3']) {
   await copyFile(`src/${f}`, `${OUT}/${f}`);
 }
 
@@ -350,6 +350,7 @@ for (const slug of slugs) {
   await writeFile(`${out}/index.html`, pageTemplate
     .replace('"__PAYLOAD__"', JSON.stringify(page))
     .replace('href="../style.css"', `href="../style.css?v=${await version('style.css')}"`)
+    .replace('src="../smidja.js"', `src="../smidja.js?v=${await version('smidja.js')}"`)
     .replace('src="../sida.js"', `src="../sida.js?v=${await version('sida.js')}"`));
   links.push(`docs/${slug}/  →  https://ragnarthorp.github.io/theme/${slug}/#k=${Buffer.from(raw).toString('base64url')}`);
 }
